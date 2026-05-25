@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Platform Hello</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel">
+        <p class="eyebrow">Multi-tier platform sample</p>
+        <h1>Platform Hello</h1>
+        <p id="message" class="message">Loading API message...</p>
+
+        <form id="item-form" class="form">
+          <label for="item-name">Item name</label>
+          <div class="form-row">
+            <input id="item-name" name="name" type="text" autocomplete="off" required>
+            <button type="submit">Add</button>
+          </div>
+        </form>
+
+        <ul id="items" class="items"></ul>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
