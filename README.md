@@ -45,7 +45,52 @@ node --test backend/test/app.test.js
 ## Test Assignment Mapping
 
 - Task 0: this repository provides the multi-tier application codebase.
-- Task 1: Terraform can provision VPC, load balancer, compute, database, registry, and environment-specific resources for this app.
-- Task 2: CI/CD can build the backend and frontend images, run tests, scan code, and deploy to provisioned environments.
-- Task 3: OPA policies can enforce production approvals and secret scanning steps.
-- Task 4: architecture and pipeline diagrams can be maintained under `docs/`.
+- Task 1: Terraform provisions AWS VPC, ALB, ECS Fargate, ECR, RDS PostgreSQL, and S3 for five environments.
+- Task 2: GitHub Actions runs tests, image builds, Terraform validation, security scanning, policy checks, and gated deployments.
+- Task 3: OPA policies enforce staging/production approvals and secret scanning in the pipeline definition.
+- Task 4: architecture, infrastructure, pipeline, and policy diagrams are maintained under `docs/architecture`.
+
+## Repository Layout
+
+```text
+backend/                 Node.js API
+frontend/                Static UI served by Nginx
+database/                Local PostgreSQL bootstrap SQL
+infra/terraform/         AWS infrastructure as code
+policy/opa/              OPA policies and tests
+docs/architecture/       Design documentation and diagrams
+.github/workflows/      CI/CD pipeline definition
+```
+
+## Infrastructure
+
+The Terraform code targets AWS and is split into reusable modules:
+
+- `infra/terraform/modules/network`: VPC, public/private subnets, internet gateway, NAT gateway, and routing.
+- `infra/terraform/modules/data`: RDS PostgreSQL and an encrypted S3 bucket.
+- `infra/terraform/modules/container-platform`: ECR, ECS Fargate services, ALB, IAM roles, logs, and service security groups.
+- `infra/terraform/stacks/platform`: shared environment stack composition.
+- `infra/terraform/envs/platform`: single entry point controlled by `environment`.
+
+Example:
+
+```bash
+cd infra/terraform/envs/platform
+terraform init
+terraform plan -var environment=dev
+```
+
+AWS credentials are intentionally not committed. Use environment variables or GitHub Actions secrets when running Terraform.
+
+## Policy
+
+OPA policies are under `policy/opa`:
+
+- Secret scanning must exist in the pipeline.
+- `staging` and `production` deployment jobs must declare protected GitHub Environments for approval.
+
+## CI/CD
+
+GitHub Actions workflow: `.github/workflows/ci.yml`.
+
+The workflow validates tests, image builds, Terraform configuration, security scanning, and OPA policies before deployment jobs can run.
