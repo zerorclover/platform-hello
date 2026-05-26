@@ -61,7 +61,7 @@ module "container_platform" {
   backend_image      = var.backend_image
   frontend_image     = var.frontend_image
   desired_count      = local.selected_environment.desired_count
-  database_url       = "postgres://${local.db_username}:${var.db_password}@${module.data.database_endpoint}:5432/${local.db_name}"
+  database_url_secret_arn = module.data.database_url_secret_arn
 }
 
 module "data" {
@@ -72,7 +72,6 @@ module "data" {
   allowed_cidr_blocks = module.network.private_subnet_cidr_blocks
   db_name             = local.db_name
   db_username         = local.db_username
-  db_password         = var.db_password
   db_instance_class   = local.selected_environment.db_instance_class
   deletion_protection = local.selected_environment.deletion_protection
 }

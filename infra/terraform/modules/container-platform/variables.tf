@@ -33,9 +33,9 @@ variable "frontend_image" {
   description = "Frontend container image URI."
 }
 
-variable "database_url" {
+variable "database_url_secret_arn" {
   type        = string
-  description = "PostgreSQL connection URL."
+  description = "Secrets Manager ARN containing the PostgreSQL connection URL."
   sensitive   = true
 }
 

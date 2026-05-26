@@ -13,7 +13,7 @@ services:
     environment:
       APP_ENV: dev
       PORT: 3000
-      DATABASE_URL: postgres://platform:platform@database:5432/platform
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@database:5432/${POSTGRES_DB:?POSTGRES_DB is required}
     ports:
       - "3000:3000"
     depends_on:
@@ -23,13 +23,13 @@ services:
   database:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: platform
-      POSTGRES_PASSWORD: platform
-      POSTGRES_DB: platform
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U platform -d platform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required} -d ${POSTGRES_DB:?POSTGRES_DB is required}"]
       interval: 5s
       timeout: 3s
       retries: 10

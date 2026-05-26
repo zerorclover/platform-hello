@@ -1,13 +1,12 @@
 import http from "node:http";
 
 import { createApp, sendNodeResponse } from "./app.js";
+import { requireDatabaseUrl } from "./config.js";
 import { PgItemStore } from "./store.js";
 
 const port = Number(process.env.PORT || 3000);
 const environment = process.env.APP_ENV || process.env.NODE_ENV || "dev";
-const databaseUrl =
-  process.env.DATABASE_URL ||
-  "postgres://platform:platform@localhost:5432/platform";
+const databaseUrl = requireDatabaseUrl();
 
 const store = new PgItemStore(databaseUrl);
 await store.initialize();

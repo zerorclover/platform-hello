@@ -20,7 +20,10 @@ flowchart LR
 
 ## Run Locally
 
+Create a local `.env` file from `.env.example` and replace `POSTGRES_PASSWORD` with a local random value. Do not commit `.env`.
+
 ```bash
+cp .env.example .env
 docker compose up --build
 ```
 

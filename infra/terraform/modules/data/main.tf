@@ -32,6 +32,11 @@ resource "aws_db_subnet_group" "this" {
   }
 }
 
+resource "random_password" "database" {
+  length  = 32
+  special = false
+}
+
 resource "aws_db_instance" "postgres" {
   identifier              = "${var.name}-postgres"
   engine                  = "postgres"
@@ -41,7 +46,7 @@ resource "aws_db_instance" "postgres" {
   storage_encrypted       = true
   db_name                 = var.db_name
   username                = var.db_username
-  password                = var.db_password
+  password                = random_password.database.result
   db_subnet_group_name    = aws_db_subnet_group.this.name
   vpc_security_group_ids  = [aws_security_group.database.id]
   backup_retention_period = 7
@@ -52,6 +57,22 @@ resource "aws_db_instance" "postgres" {
   tags = {
     Name = "${var.name}-postgres"
   }
+}
+
+resource "aws_secretsmanager_secret" "database_url" {
+  name        = "${var.name}/database-url"
+  description = "Database connection URL for ${var.name}"
+}
+
+resource "aws_secretsmanager_secret_version" "database_url" {
+  secret_id = aws_secretsmanager_secret.database_url.id
+  secret_string = format(
+    "postgres://%s:%s@%s:5432/%s",
+    var.db_username,
+    random_password.database.result,
+    aws_db_instance.postgres.address,
+    var.db_name
+  )
 }
 
 resource "aws_s3_bucket" "assets" {

@@ -6,6 +6,7 @@ OPA policies live under `policy/opa`. They enforce two required controls:
 
 - The pipeline must include secret scanning.
 - Staging and production deployment jobs must declare protected GitHub Environments.
+- Runtime credentials must be provided by platform secret stores such as GitHub Actions secrets, local `.env` files ignored by Git, or AWS Secrets Manager.
 
 ## Policy Flow
 

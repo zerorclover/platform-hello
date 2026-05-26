@@ -145,6 +145,20 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  name = "${var.name}-task-execution-secrets"
+  role = aws_iam_role.task_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = ["secretsmanager:GetSecretValue"]
+      Effect   = "Allow"
+      Resource = var.database_url_secret_arn
+    }]
+  })
+}
+
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/ecs/${var.name}"
   retention_in_days = 14
@@ -169,8 +183,10 @@ resource "aws_ecs_task_definition" "backend" {
     }]
     environment = [
       { name = "APP_ENV", value = var.environment },
-      { name = "PORT", value = "3000" },
-      { name = "DATABASE_URL", value = var.database_url }
+      { name = "PORT", value = "3000" }
+    ]
+    secrets = [
+      { name = "DATABASE_URL", valueFrom = var.database_url_secret_arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"

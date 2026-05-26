@@ -22,11 +22,12 @@ terraform validate
 terraform plan \
   -var environment=dev \
   -var backend_image=111111111111.dkr.ecr.us-west-2.amazonaws.com/platform-hello-dev-backend:latest \
-  -var frontend_image=111111111111.dkr.ecr.us-west-2.amazonaws.com/platform-hello-dev-frontend:latest \
-  -var db_password="$DB_PASSWORD"
+  -var frontend_image=111111111111.dkr.ecr.us-west-2.amazonaws.com/platform-hello-dev-frontend:latest
 ```
 
 Use the same command with `environment=test`, `environment=perf`, `environment=staging`, or `environment=production` to select another environment without duplicating the parameter set.
+
+Database credentials are generated with the Terraform `random` provider and exposed to ECS through AWS Secrets Manager. The application receives `DATABASE_URL` as an ECS secret, not as a plain task environment variable.
 
 ## State
 
