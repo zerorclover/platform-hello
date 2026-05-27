@@ -33,6 +33,21 @@ variable "db_instance_class" {
   description = "RDS instance class."
 }
 
+variable "db_engine_version" {
+  type        = string
+  description = "RDS PostgreSQL engine version."
+}
+
+variable "db_allocated_storage" {
+  type        = number
+  description = "RDS allocated storage in GiB."
+}
+
+variable "db_backup_retention_days" {
+  type        = number
+  description = "RDS backup retention in days."
+}
+
 variable "deletion_protection" {
   type        = bool
   description = "Whether deletion protection is enabled."

@@ -20,16 +20,29 @@
         { "run": "terraform validate" }
       ]
     },
-    "deploy-staging": {
-      "environment": "staging",
+    "prepare-environment": {
       "steps": [
-        { "run": "terraform plan/apply -var environment=staging" }
+        { "uses": "actions/checkout@v4" },
+        { "uses": "hashicorp/setup-terraform@v3" },
+        { "uses": "aws-actions/configure-aws-credentials@v4" },
+        { "run": "terraform apply -target=module.platform.module.container_platform.aws_ecr_repository.backend -target=module.platform.module.container_platform.aws_ecr_repository.frontend" }
       ]
     },
-    "deploy-production": {
-      "environment": "production",
+    "package-images": {
+      "needs": ["prepare-environment"],
       "steps": [
-        { "run": "terraform plan/apply -var environment=production" }
+        { "uses": "actions/checkout@v4" },
+        { "uses": "docker/setup-buildx-action@v3" },
+        { "uses": "aws-actions/configure-aws-credentials@v4" },
+        { "uses": "aws-actions/amazon-ecr-login@v2" },
+        { "uses": "docker/build-push-action@v6", "with": { "push": true } }
+      ]
+    },
+    "deploy": {
+      "environment": "${{ inputs.environment }}",
+      "needs": ["package-images"],
+      "steps": [
+        { "run": "terraform plan/apply with TF_VAR_environment from workflow input" }
       ]
     }
   }

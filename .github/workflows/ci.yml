@@ -48,7 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker-build:
-    name: Container image build
+    name: Container image validation build
     runs-on: ubuntu-latest
     needs:
       - backend-test
@@ -66,6 +66,84 @@ jobs:
           push: false
           tags: platform-hello-${{ matrix.component }}:${{ github.sha }}
 
+  prepare-environment:
+    name: Prepare selected environment
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs:
+      - docker-build
+      - secret-scan
+      - security-scan
+      - terraform-validate
+      - policy
+    if: github.event_name == 'workflow_dispatch'
+    env:
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-${{ inputs.environment }}-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-${{ inputs.environment }}-frontend:${{ github.sha }}
+      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
+      TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
+      TF_VAR_db_name: ${{ vars.DB_NAME }}
+      TF_VAR_db_username: ${{ vars.DB_USERNAME }}
+      TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
+      TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
+      TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
+      TF_VAR_ecs_task_cpu: ${{ vars.ECS_TASK_CPU }}
+      TF_VAR_ecs_task_memory: ${{ vars.ECS_TASK_MEMORY }}
+      TF_VAR_log_retention_days: ${{ vars.LOG_RETENTION_DAYS }}
+      TF_VAR_db_engine_version: ${{ vars.DB_ENGINE_VERSION }}
+      TF_VAR_db_allocated_storage: ${{ vars.DB_ALLOCATED_STORAGE }}
+      TF_VAR_db_backup_retention_days: ${{ vars.DB_BACKUP_RETENTION_DAYS }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: |
+          terraform init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=platform-hello/${TF_VAR_environment}/terraform.tfstate" \
+            -backend-config="region=${TF_VAR_aws_region}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
+        working-directory: infra/terraform/envs/platform
+      - run: |
+          terraform apply -auto-approve \
+            -target=module.platform.module.container_platform.aws_ecr_repository.backend \
+            -target=module.platform.module.container_platform.aws_ecr_repository.frontend
+        working-directory: infra/terraform/envs/platform
+
+  package-images:
+    name: Package environment images
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs:
+      - prepare-environment
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        component:
+          - backend
+          - frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-${{ inputs.environment }}-${{ matrix.component }}:${{ github.sha }}
+
   security-scan:
     name: Filesystem security scan
     runs-on: ubuntu-latest
@@ -81,6 +159,24 @@ jobs:
   terraform-validate:
     name: Terraform validation
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_environment: ${{ vars.TF_VALIDATE_ENVIRONMENT }}
+      TF_VAR_aws_region: ${{ vars.TF_VALIDATE_AWS_REGION }}
+      TF_VAR_backend_image: ${{ vars.TF_VALIDATE_BACKEND_IMAGE }}
+      TF_VAR_frontend_image: ${{ vars.TF_VALIDATE_FRONTEND_IMAGE }}
+      TF_VAR_vpc_cidr: ${{ vars.TF_VALIDATE_VPC_CIDR }}
+      TF_VAR_availability_zones: ${{ vars.TF_VALIDATE_AVAILABILITY_ZONES_JSON }}
+      TF_VAR_db_name: ${{ vars.TF_VALIDATE_DB_NAME }}
+      TF_VAR_db_username: ${{ vars.TF_VALIDATE_DB_USERNAME }}
+      TF_VAR_db_instance_class: ${{ vars.TF_VALIDATE_DB_INSTANCE_CLASS }}
+      TF_VAR_desired_count: ${{ vars.TF_VALIDATE_DESIRED_COUNT }}
+      TF_VAR_deletion_protection: ${{ vars.TF_VALIDATE_DELETION_PROTECTION }}
+      TF_VAR_ecs_task_cpu: ${{ vars.TF_VALIDATE_ECS_TASK_CPU }}
+      TF_VAR_ecs_task_memory: ${{ vars.TF_VALIDATE_ECS_TASK_MEMORY }}
+      TF_VAR_log_retention_days: ${{ vars.TF_VALIDATE_LOG_RETENTION_DAYS }}
+      TF_VAR_db_engine_version: ${{ vars.TF_VALIDATE_DB_ENGINE_VERSION }}
+      TF_VAR_db_allocated_storage: ${{ vars.TF_VALIDATE_DB_ALLOCATED_STORAGE }}
+      TF_VAR_db_backup_retention_days: ${{ vars.TF_VALIDATE_DB_BACKUP_RETENTION_DAYS }}
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -105,22 +201,22 @@ jobs:
           violations="$(opa eval --format raw --data policy/opa --input policy/opa/input/github_actions.json 'count(data.platform.pipeline.deny)')"
           test "$violations" = "0"
 
-  deploy-dev:
-    name: Deploy dev
+  deploy:
+    name: Deploy selected environment
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ inputs.environment }}
     needs:
-      - docker-build
+      - package-images
       - secret-scan
       - security-scan
       - terraform-validate
       - policy
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'dev'
+    if: github.event_name == 'workflow_dispatch'
     env:
-      TF_VAR_environment: dev
+      TF_VAR_environment: ${{ inputs.environment }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-dev-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-dev-frontend:${{ github.sha }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-${{ inputs.environment }}-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-${{ inputs.environment }}-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -128,6 +224,12 @@ jobs:
       TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
       TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
       TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
+      TF_VAR_ecs_task_cpu: ${{ vars.ECS_TASK_CPU }}
+      TF_VAR_ecs_task_memory: ${{ vars.ECS_TASK_MEMORY }}
+      TF_VAR_log_retention_days: ${{ vars.LOG_RETENTION_DAYS }}
+      TF_VAR_db_engine_version: ${{ vars.DB_ENGINE_VERSION }}
+      TF_VAR_db_allocated_storage: ${{ vars.DB_ALLOCATED_STORAGE }}
+      TF_VAR_db_backup_retention_days: ${{ vars.DB_BACKUP_RETENTION_DAYS }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
     steps:
@@ -140,187 +242,7 @@ jobs:
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=platform-hello/dev/terraform.tfstate" \
-            -backend-config="region=${TF_VAR_aws_region}" \
-            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
-            -backend-config="encrypt=true"
-        working-directory: infra/terraform/envs/platform
-      - run: terraform plan -out=tfplan
-        working-directory: infra/terraform/envs/platform
-      - run: terraform apply -auto-approve tfplan
-        working-directory: infra/terraform/envs/platform
-
-  deploy-test:
-    name: Deploy test
-    runs-on: ubuntu-latest
-    environment: test
-    needs:
-      - docker-build
-      - secret-scan
-      - security-scan
-      - terraform-validate
-      - policy
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'test'
-    env:
-      TF_VAR_environment: test
-      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-test-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-test-frontend:${{ github.sha }}
-      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
-      TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
-      TF_VAR_db_name: ${{ vars.DB_NAME }}
-      TF_VAR_db_username: ${{ vars.DB_USERNAME }}
-      TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
-      TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
-      TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - run: |
-          terraform init \
-            -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=platform-hello/test/terraform.tfstate" \
-            -backend-config="region=${TF_VAR_aws_region}" \
-            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
-            -backend-config="encrypt=true"
-        working-directory: infra/terraform/envs/platform
-      - run: terraform plan -out=tfplan
-        working-directory: infra/terraform/envs/platform
-      - run: terraform apply -auto-approve tfplan
-        working-directory: infra/terraform/envs/platform
-
-  deploy-perf:
-    name: Deploy perf
-    runs-on: ubuntu-latest
-    environment: perf
-    needs:
-      - docker-build
-      - secret-scan
-      - security-scan
-      - terraform-validate
-      - policy
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'perf'
-    env:
-      TF_VAR_environment: perf
-      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-perf-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-perf-frontend:${{ github.sha }}
-      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
-      TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
-      TF_VAR_db_name: ${{ vars.DB_NAME }}
-      TF_VAR_db_username: ${{ vars.DB_USERNAME }}
-      TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
-      TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
-      TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - run: |
-          terraform init \
-            -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=platform-hello/perf/terraform.tfstate" \
-            -backend-config="region=${TF_VAR_aws_region}" \
-            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
-            -backend-config="encrypt=true"
-        working-directory: infra/terraform/envs/platform
-      - run: terraform plan -out=tfplan
-        working-directory: infra/terraform/envs/platform
-      - run: terraform apply -auto-approve tfplan
-        working-directory: infra/terraform/envs/platform
-
-  deploy-staging:
-    name: Deploy staging
-    runs-on: ubuntu-latest
-    environment: staging
-    needs:
-      - docker-build
-      - secret-scan
-      - security-scan
-      - terraform-validate
-      - policy
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'
-    env:
-      TF_VAR_environment: staging
-      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-staging-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-staging-frontend:${{ github.sha }}
-      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
-      TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
-      TF_VAR_db_name: ${{ vars.DB_NAME }}
-      TF_VAR_db_username: ${{ vars.DB_USERNAME }}
-      TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
-      TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
-      TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - run: |
-          terraform init \
-            -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=platform-hello/staging/terraform.tfstate" \
-            -backend-config="region=${TF_VAR_aws_region}" \
-            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
-            -backend-config="encrypt=true"
-        working-directory: infra/terraform/envs/platform
-      - run: terraform plan -out=tfplan
-        working-directory: infra/terraform/envs/platform
-      - run: terraform apply -auto-approve tfplan
-        working-directory: infra/terraform/envs/platform
-
-  deploy-production:
-    name: Deploy production
-    runs-on: ubuntu-latest
-    environment: production
-    needs:
-      - docker-build
-      - secret-scan
-      - security-scan
-      - terraform-validate
-      - policy
-    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
-    env:
-      TF_VAR_environment: production
-      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-production-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-production-frontend:${{ github.sha }}
-      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
-      TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
-      TF_VAR_db_name: ${{ vars.DB_NAME }}
-      TF_VAR_db_username: ${{ vars.DB_USERNAME }}
-      TF_VAR_db_instance_class: ${{ vars.DB_INSTANCE_CLASS }}
-      TF_VAR_desired_count: ${{ vars.DESIRED_COUNT }}
-      TF_VAR_deletion_protection: ${{ vars.DELETION_PROTECTION }}
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
-      - run: |
-          terraform init \
-            -backend-config="bucket=${TF_STATE_BUCKET}" \
-            -backend-config="key=platform-hello/production/terraform.tfstate" \
+            -backend-config="key=platform-hello/${TF_VAR_environment}/terraform.tfstate" \
             -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"

@@ -161,15 +161,15 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
 
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/ecs/${var.name}"
-  retention_in_days = 14
+  retention_in_days = var.log_retention_days
 }
 
 resource "aws_ecs_task_definition" "backend" {
   family                   = "${var.name}-backend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
+  cpu                      = var.ecs_task_cpu
+  memory                   = var.ecs_task_memory
   execution_role_arn       = aws_iam_role.task_execution.arn
 
   container_definitions = jsonencode([{
@@ -203,8 +203,8 @@ resource "aws_ecs_task_definition" "frontend" {
   family                   = "${var.name}-frontend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
+  cpu                      = var.ecs_task_cpu
+  memory                   = var.ecs_task_memory
   execution_role_arn       = aws_iam_role.task_execution.arn
 
   container_definitions = jsonencode([{

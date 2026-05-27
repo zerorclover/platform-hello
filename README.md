@@ -100,8 +100,34 @@ For CI/CD, configure GitHub Environment variables for each environment:
 - `DB_INSTANCE_CLASS`
 - `DESIRED_COUNT`
 - `DELETION_PROTECTION`
+- `ECS_TASK_CPU`
+- `ECS_TASK_MEMORY`
+- `LOG_RETENTION_DAYS`
+- `DB_ENGINE_VERSION`
+- `DB_ALLOCATED_STORAGE`
+- `DB_BACKUP_RETENTION_DAYS`
 - `TF_STATE_BUCKET`
 - `TF_STATE_LOCK_TABLE`
+
+Configure these repository-level GitHub Actions variables for Terraform validation:
+
+- `TF_VALIDATE_ENVIRONMENT`
+- `TF_VALIDATE_AWS_REGION`
+- `TF_VALIDATE_BACKEND_IMAGE`
+- `TF_VALIDATE_FRONTEND_IMAGE`
+- `TF_VALIDATE_VPC_CIDR`
+- `TF_VALIDATE_AVAILABILITY_ZONES_JSON`
+- `TF_VALIDATE_DB_NAME`
+- `TF_VALIDATE_DB_USERNAME`
+- `TF_VALIDATE_DB_INSTANCE_CLASS`
+- `TF_VALIDATE_DESIRED_COUNT`
+- `TF_VALIDATE_DELETION_PROTECTION`
+- `TF_VALIDATE_ECS_TASK_CPU`
+- `TF_VALIDATE_ECS_TASK_MEMORY`
+- `TF_VALIDATE_LOG_RETENTION_DAYS`
+- `TF_VALIDATE_DB_ENGINE_VERSION`
+- `TF_VALIDATE_DB_ALLOCATED_STORAGE`
+- `TF_VALIDATE_DB_BACKUP_RETENTION_DAYS`
 
 Configure these GitHub Environment secrets:
 
@@ -115,10 +141,12 @@ Terraform state is stored in an encrypted S3 bucket and locked by DynamoDB. Boot
 OPA policies are under `policy/opa`:
 
 - Secret scanning must exist in the pipeline.
-- `staging` and `production` deployment jobs must declare protected GitHub Environments for approval.
+- Deployment jobs must depend on the ECR image publishing job.
+- Deployment jobs must declare a GitHub Environment so protected environments can require approval.
 
 ## CI/CD
 
 GitHub Actions workflow: `.github/workflows/ci.yml`.
 
 The workflow validates tests, image builds, Terraform configuration, security scanning, and OPA policies before deployment jobs can run.
+For manual deployments, the selected GitHub Environment supplies the variables and secrets, the workflow publishes environment-scoped backend/frontend images to ECR, and the matching deploy job applies Terraform with those image tags.

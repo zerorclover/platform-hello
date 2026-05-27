@@ -2,10 +2,12 @@
 
 ## Overview
 
-OPA policies live under `policy/opa`. They enforce two required controls:
+OPA policies live under `policy/opa`. They enforce required pipeline controls:
 
 - The pipeline must include secret scanning.
-- Staging and production deployment jobs must declare protected GitHub Environments.
+- The pipeline must publish environment-scoped images to ECR before deployment.
+- Deployment jobs must depend on the ECR image publishing job.
+- Deployment jobs must declare a GitHub Environment, so repository settings can enforce approvals for protected environments such as staging and production.
 - Runtime credentials must be provided by platform secret stores such as GitHub Actions secrets, local `.env` files ignored by Git, or AWS Secrets Manager.
 
 ## Policy Flow
@@ -34,4 +36,4 @@ Configure these GitHub Environments:
 - `staging`: require one or more reviewers.
 - `production`: require one or more reviewers.
 
-The workflow declares those environments; repository settings enforce the human approval gate.
+The workflow selects one of those environments from `workflow_dispatch.inputs.environment`; repository settings enforce the human approval gate.

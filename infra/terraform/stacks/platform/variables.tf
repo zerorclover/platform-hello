@@ -51,3 +51,33 @@ variable "deletion_protection" {
   type        = bool
   description = "RDS deletion protection flag supplied by CI/CD."
 }
+
+variable "ecs_task_cpu" {
+  type        = number
+  description = "ECS task CPU units supplied by CI/CD."
+}
+
+variable "ecs_task_memory" {
+  type        = number
+  description = "ECS task memory in MiB supplied by CI/CD."
+}
+
+variable "log_retention_days" {
+  type        = number
+  description = "CloudWatch log retention in days supplied by CI/CD."
+}
+
+variable "db_engine_version" {
+  type        = string
+  description = "RDS PostgreSQL engine version supplied by CI/CD."
+}
+
+variable "db_allocated_storage" {
+  type        = number
+  description = "RDS allocated storage in GiB supplied by CI/CD."
+}
+
+variable "db_backup_retention_days" {
+  type        = number
+  description = "RDS backup retention in days supplied by CI/CD."
+}

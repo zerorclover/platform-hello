@@ -8,12 +8,15 @@ test_valid_pipeline_has_no_denies if {
       "secret-scan": {
         "steps": [{"uses": "gitleaks/gitleaks-action@v2"}]
       },
-      "deploy-staging": {
-        "environment": "staging",
-        "steps": [{"run": "terraform apply"}]
+      "package-images": {
+        "steps": [
+          {"uses": "aws-actions/amazon-ecr-login@v2"},
+          {"uses": "docker/build-push-action@v6", "with": {"push": true}}
+        ]
       },
-      "deploy-production": {
-        "environment": {"name": "production"},
+      "deploy": {
+        "environment": "staging",
+        "needs": ["package-images"],
         "steps": [{"run": "terraform apply"}]
       }
     }
@@ -31,26 +34,76 @@ test_missing_secret_scan_is_denied if {
   }
 }
 
-test_missing_staging_environment_is_denied if {
-  deny["deploy-staging must declare a protected GitHub environment for approval"] with input as {
+test_missing_deploy_environment_is_denied if {
+  deny["deploy must declare a GitHub environment for approval"] with input as {
     "jobs": {
       "secret-scan": {
         "steps": [{"uses": "gitleaks/gitleaks-action@v2"}]
       },
-      "deploy-staging": {
+      "package-images": {
+        "steps": [
+          {"uses": "aws-actions/amazon-ecr-login@v2"},
+          {"uses": "docker/build-push-action@v6", "with": {"push": true}}
+        ]
+      },
+      "deploy": {
+        "needs": ["package-images"],
         "steps": [{"run": "terraform apply"}]
       }
     }
   }
 }
 
-test_missing_production_environment_is_denied if {
-  deny["deploy-production must declare a protected GitHub environment for approval"] with input as {
+test_missing_deploy_environment_object_name_is_denied if {
+  deny["deploy must declare a GitHub environment for approval"] with input as {
     "jobs": {
       "secret-scan": {
         "steps": [{"uses": "gitleaks/gitleaks-action@v2"}]
       },
-      "deploy-production": {
+      "package-images": {
+        "steps": [
+          {"uses": "aws-actions/amazon-ecr-login@v2"},
+          {"uses": "docker/build-push-action@v6", "with": {"push": true}}
+        ]
+      },
+      "deploy": {
+        "environment": {"name": ""},
+        "needs": ["package-images"],
+        "steps": [{"run": "terraform apply"}]
+      }
+    }
+  }
+}
+
+test_missing_ecr_image_publish_is_denied if {
+  deny["pipeline must publish environment-scoped images to ECR before deployment"] with input as {
+    "jobs": {
+      "secret-scan": {
+        "steps": [{"uses": "gitleaks/gitleaks-action@v2"}]
+      },
+      "deploy": {
+        "environment": "staging",
+        "needs": ["package-images"],
+        "steps": [{"run": "terraform apply"}]
+      }
+    }
+  }
+}
+
+test_deploy_without_package_images_dependency_is_denied if {
+  deny["deploy must depend on package-images"] with input as {
+    "jobs": {
+      "secret-scan": {
+        "steps": [{"uses": "gitleaks/gitleaks-action@v2"}]
+      },
+      "package-images": {
+        "steps": [
+          {"uses": "aws-actions/amazon-ecr-login@v2"},
+          {"uses": "docker/build-push-action@v6", "with": {"push": true}}
+        ]
+      },
+      "deploy": {
+        "environment": "staging",
         "steps": [{"run": "terraform apply"}]
       }
     }

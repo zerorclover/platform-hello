@@ -43,3 +43,18 @@ variable "desired_count" {
   type        = number
   description = "Desired ECS task count for each service."
 }
+
+variable "ecs_task_cpu" {
+  type        = number
+  description = "ECS task CPU units."
+}
+
+variable "ecs_task_memory" {
+  type        = number
+  description = "ECS task memory in MiB."
+}
+
+variable "log_retention_days" {
+  type        = number
+  description = "CloudWatch log retention in days."
+}

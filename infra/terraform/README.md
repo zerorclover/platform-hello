@@ -10,7 +10,7 @@ This directory contains AWS infrastructure as code for `platform-hello`.
 - `staging`: pre-production integration and UAT environment.
 - `production`: production environment with stricter sizing and deletion protection defaults.
 
-The root entry point is `infra/terraform/envs/platform`. Terraform exposes environment-specific values as variables. CI/CD supplies those values through `TF_VAR_*`, so the stack does not hard-code per-environment CIDR ranges, availability zones, task counts, RDS sizing, or deletion protection.
+The root entry point is `infra/terraform/envs/platform`. Terraform exposes environment-specific values as variables. CI/CD supplies those values through `TF_VAR_*`, so the stack does not hard-code per-environment CIDR ranges, availability zones, task counts, ECS sizing, log retention, RDS sizing, backup retention, engine version, or deletion protection.
 
 ## Commands
 
@@ -47,10 +47,16 @@ TF_VAR_db_username=platform \
 TF_VAR_db_instance_class=db.t4g.micro \
 TF_VAR_desired_count=1 \
 TF_VAR_deletion_protection=false \
+TF_VAR_ecs_task_cpu=256 \
+TF_VAR_ecs_task_memory=512 \
+TF_VAR_log_retention_days=14 \
+TF_VAR_db_engine_version=16.3 \
+TF_VAR_db_allocated_storage=20 \
+TF_VAR_db_backup_retention_days=7 \
 terraform plan
 ```
 
-In GitHub Actions, these same values are provided by matrix values for validation and by GitHub Environment variables for deployment.
+In GitHub Actions, these same values are provided by repository variables for validation and by GitHub Environment variables for deployment.
 
 Database credentials are generated with the Terraform `random` provider and exposed to ECS through AWS Secrets Manager. The application receives `DATABASE_URL` as an ECS secret, not as a plain task environment variable.
 
