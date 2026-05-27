@@ -28,6 +28,17 @@ terraform plan
 
 Environment-specific values are not copied across five Terraform directories and are not hard-coded in the Terraform stack. They are supplied by GitHub Actions as `TF_VAR_environment`, `TF_VAR_vpc_cidr`, `TF_VAR_availability_zones`, `TF_VAR_db_instance_class`, `TF_VAR_desired_count`, and `TF_VAR_deletion_protection`.
 
+## Terraform State
+
+Terraform state uses an S3 backend configured at `terraform init` time by CI/CD:
+
+- State bucket: `TF_STATE_BUCKET`
+- State key: `platform-hello/<environment>/terraform.tfstate`
+- Lock table: `TF_STATE_LOCK_TABLE`
+- Encryption: `encrypt=true`
+
+The backend bucket and lock table are provisioned by `infra/terraform/bootstrap/state-backend`. The bucket has versioning, AES256 encryption, public access block, and bucket-owner-enforced object ownership. The DynamoDB lock table uses the `LockID` hash key, server-side encryption, and point-in-time recovery.
+
 ## Production Notes
 
 - `staging` and `production` enable RDS deletion protection.

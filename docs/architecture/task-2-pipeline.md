@@ -39,6 +39,7 @@ Terraform environment settings are owned by CI/CD, not hard-coded inside Terrafo
 - Validation uses workflow matrix values and exports them as `TF_VAR_*`.
 - Deployment uses GitHub Environment variables such as `VPC_CIDR`, `AVAILABILITY_ZONES_JSON`, `DB_INSTANCE_CLASS`, `DESIRED_COUNT`, and `DELETION_PROTECTION`.
 - AWS identity and account values are read from GitHub Environment secrets.
+- Terraform backend values are read from `TF_STATE_BUCKET` and `TF_STATE_LOCK_TABLE`, then passed to `terraform init` with `encrypt=true` and an environment-specific state key.
 
 ## Approval Model
 

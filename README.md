@@ -79,7 +79,12 @@ Example:
 
 ```bash
 cd infra/terraform/envs/platform
-terraform init
+terraform init \
+  -backend-config="bucket=$TF_STATE_BUCKET" \
+  -backend-config="key=platform-hello/dev/terraform.tfstate" \
+  -backend-config="region=us-west-2" \
+  -backend-config="dynamodb_table=$TF_STATE_LOCK_TABLE" \
+  -backend-config="encrypt=true"
 terraform plan
 ```
 
@@ -94,11 +99,15 @@ For CI/CD, configure GitHub Environment variables for each environment:
 - `DB_INSTANCE_CLASS`
 - `DESIRED_COUNT`
 - `DELETION_PROTECTION`
+- `TF_STATE_BUCKET`
+- `TF_STATE_LOCK_TABLE`
 
 Configure these GitHub Environment secrets:
 
 - `AWS_ACCOUNT_ID`
 - `AWS_ROLE_TO_ASSUME`
+
+Terraform state is stored in an encrypted S3 bucket and locked by DynamoDB. Bootstrap those backend resources from `infra/terraform/bootstrap/state-backend` before running environment deployments.
 
 ## Policy
 

@@ -14,9 +14,26 @@ The root entry point is `infra/terraform/envs/platform`. Terraform exposes envir
 
 ## Commands
 
+Bootstrap the remote state backend once per AWS account:
+
+```bash
+cd infra/terraform/bootstrap/state-backend
+terraform init
+terraform apply \
+  -var state_bucket_name=platform-hello-tfstate-<account-id> \
+  -var lock_table_name=platform-hello-tf-locks
+```
+
+Then run the platform stack with remote state:
+
 ```bash
 cd infra/terraform/envs/platform
-terraform init
+terraform init \
+  -backend-config="bucket=platform-hello-tfstate-<account-id>" \
+  -backend-config="key=platform-hello/dev/terraform.tfstate" \
+  -backend-config="region=us-west-2" \
+  -backend-config="dynamodb_table=platform-hello-tf-locks" \
+  -backend-config="encrypt=true"
 terraform fmt -recursive
 terraform validate
 TF_VAR_environment=dev \
@@ -38,4 +55,18 @@ Database credentials are generated with the Terraform `random` provider and expo
 
 ## State
 
-Remote state is not hard-coded because backend bucket names and access policies should be created by the owning AWS account. For a real deployment, configure an S3 backend and DynamoDB lock table per account or per environment.
+The platform stack uses a partial S3 backend so account-specific backend values are supplied by CI/CD:
+
+- `bucket`: `TF_STATE_BUCKET` GitHub Environment variable.
+- `key`: `platform-hello/<environment>/terraform.tfstate`.
+- `region`: workflow `AWS_REGION`.
+- `dynamodb_table`: `TF_STATE_LOCK_TABLE` GitHub Environment variable.
+- `encrypt`: `true`.
+
+The bootstrap stack creates:
+
+- An S3 bucket with versioning enabled.
+- S3 server-side encryption using AES256.
+- S3 public access block and bucket-owner-enforced ownership.
+- A DynamoDB lock table with `LockID` hash key.
+- DynamoDB server-side encryption and point-in-time recovery.
