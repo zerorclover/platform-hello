@@ -1,4 +1,4 @@
-variable "name" {
+variable "name_prefix" {
   type        = string
   description = "Name prefix for data resources."
 }
@@ -51,4 +51,9 @@ variable "db_backup_retention_days" {
 variable "deletion_protection" {
   type        = bool
   description = "Whether deletion protection is enabled."
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Common tags applied to data resources."
 }

@@ -75,6 +75,8 @@ The Terraform code targets AWS and is split into reusable modules:
 - `infra/terraform/stacks/platform`: shared environment stack composition.
 - `infra/terraform/envs/platform`: single entry point; all environment-specific parameters are injected by CI/CD through `TF_VAR_*`.
 
+Terraform derives resource names from a standard `platform-hello-<environment>` prefix and uses shorter `ph-<environment>` names where AWS length limits apply. Taggable resources receive common tags (`Application`, `Environment`, `ManagedBy`, `Project`) plus resource-specific `Name` and `Component` tags.
+
 Example:
 
 ```bash

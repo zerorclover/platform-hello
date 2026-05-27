@@ -1,27 +1,42 @@
 resource "aws_ecr_repository" "backend" {
-  name                 = "${var.name}-backend"
+  name                 = "${var.name_prefix}-backend"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-backend"
+    Component = "backend"
+  })
 }
 
 resource "aws_ecr_repository" "frontend" {
-  name                 = "${var.name}-frontend"
+  name                 = "${var.name_prefix}-frontend"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-frontend"
+    Component = "frontend"
+  })
 }
 
 resource "aws_ecs_cluster" "this" {
-  name = var.name
+  name = var.name_prefix
+
+  tags = merge(var.tags, {
+    Name      = var.name_prefix
+    Component = "container-platform"
+  })
 }
 
 resource "aws_security_group" "alb" {
-  name        = "${var.name}-alb"
+  name        = "${var.name_prefix}-alb"
   description = "Public ALB access"
   vpc_id      = var.vpc_id
 
@@ -38,10 +53,15 @@ resource "aws_security_group" "alb" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-alb"
+    Component = "load-balancer"
+  })
 }
 
 resource "aws_security_group" "service" {
-  name        = "${var.name}-service"
+  name        = "${var.name_prefix}-service"
   description = "ECS service access from ALB"
   vpc_id      = var.vpc_id
 
@@ -65,17 +85,27 @@ resource "aws_security_group" "service" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-service"
+    Component = "container-platform"
+  })
 }
 
 resource "aws_lb" "this" {
-  name               = var.name
+  name               = "${var.short_name_prefix}-alb"
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = var.public_subnet_ids
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-alb"
+    Component = "load-balancer"
+  })
 }
 
 resource "aws_lb_target_group" "frontend" {
-  name        = "${var.name}-frontend"
+  name        = "${var.short_name_prefix}-fe"
   port        = 80
   protocol    = "HTTP"
   target_type = "ip"
@@ -84,10 +114,15 @@ resource "aws_lb_target_group" "frontend" {
   health_check {
     path = "/"
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-frontend"
+    Component = "frontend"
+  })
 }
 
 resource "aws_lb_target_group" "backend" {
-  name        = "${var.name}-backend"
+  name        = "${var.short_name_prefix}-be"
   port        = 3000
   protocol    = "HTTP"
   target_type = "ip"
@@ -96,6 +131,11 @@ resource "aws_lb_target_group" "backend" {
   health_check {
     path = "/health"
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-backend"
+    Component = "backend"
+  })
 }
 
 resource "aws_lb_listener" "http" {
@@ -107,6 +147,11 @@ resource "aws_lb_listener" "http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-http"
+    Component = "load-balancer"
+  })
 }
 
 resource "aws_lb_listener_rule" "api" {
@@ -123,10 +168,15 @@ resource "aws_lb_listener_rule" "api" {
       values = ["/api/*", "/health"]
     }
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-api"
+    Component = "backend"
+  })
 }
 
 resource "aws_iam_role" "task_execution" {
-  name = "${var.name}-task-execution"
+  name = "${var.name_prefix}-task-execution"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -138,6 +188,11 @@ resource "aws_iam_role" "task_execution" {
       }
     }]
   })
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-task-execution"
+    Component = "container-platform"
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "task_execution" {
@@ -146,7 +201,7 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
 }
 
 resource "aws_iam_role_policy" "task_execution_secrets" {
-  name = "${var.name}-task-execution-secrets"
+  name = "${var.name_prefix}-task-execution-secrets"
   role = aws_iam_role.task_execution.id
 
   policy = jsonencode({
@@ -160,12 +215,17 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
 }
 
 resource "aws_cloudwatch_log_group" "this" {
-  name              = "/ecs/${var.name}"
+  name              = "/ecs/${var.name_prefix}"
   retention_in_days = var.log_retention_days
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-logs"
+    Component = "container-platform"
+  })
 }
 
 resource "aws_ecs_task_definition" "backend" {
-  family                   = "${var.name}-backend"
+  family                   = "${var.name_prefix}-backend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
@@ -197,10 +257,15 @@ resource "aws_ecs_task_definition" "backend" {
       }
     }
   }])
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-backend"
+    Component = "backend"
+  })
 }
 
 resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${var.name}-frontend"
+  family                   = "${var.name_prefix}-frontend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
@@ -225,12 +290,17 @@ resource "aws_ecs_task_definition" "frontend" {
       }
     }
   }])
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-frontend"
+    Component = "frontend"
+  })
 }
 
 data "aws_region" "current" {}
 
 resource "aws_ecs_service" "backend" {
-  name            = "${var.name}-backend"
+  name            = "${var.name_prefix}-backend"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.backend.arn
   desired_count   = var.desired_count
@@ -246,10 +316,15 @@ resource "aws_ecs_service" "backend" {
     container_name   = "backend"
     container_port   = 3000
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-backend"
+    Component = "backend"
+  })
 }
 
 resource "aws_ecs_service" "frontend" {
-  name            = "${var.name}-frontend"
+  name            = "${var.name_prefix}-frontend"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.frontend.arn
   desired_count   = var.desired_count
@@ -265,4 +340,9 @@ resource "aws_ecs_service" "frontend" {
     container_name   = "frontend"
     container_port   = 80
   }
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-frontend"
+    Component = "frontend"
+  })
 }

@@ -182,6 +182,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive
         working-directory: infra/terraform
+      - run: node scripts/check-terraform-standards.mjs
       - run: terraform init -backend=false
         working-directory: infra/terraform/envs/platform
       - run: terraform validate

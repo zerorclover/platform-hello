@@ -30,7 +30,7 @@ flowchart TD
 - `prepare-environment`: on manual deployments, uses the selected GitHub Environment and Terraform state to create or confirm the ECR repositories before image push.
 - `package-images`: logs in to ECR and pushes backend/frontend images tagged with the commit SHA.
 - `security-scan`: runs Trivy filesystem scanning.
-- `terraform-validate`: checks Terraform formatting and variable contract without embedding environment values.
+- `terraform-validate`: checks Terraform formatting, naming/tagging standards, and variable contract without embedding environment values.
 - `policy`: runs OPA tests and evaluates the pipeline policy input.
 - `deploy`: manual deployment job selected by `workflow_dispatch.inputs.environment`.
 
@@ -45,4 +45,4 @@ Terraform environment settings are owned by CI/CD, not hard-coded inside Terrafo
 
 ## Approval Model
 
-The `deploy-staging` and `deploy-production` jobs declare GitHub Environments named `staging` and `production`. In a real repository, those environments should require reviewers in repository settings so GitHub blocks the deployment until approval is granted.
+The `deploy` job declares the selected GitHub Environment from `workflow_dispatch.inputs.environment`. In a real repository, staging and production environments should require reviewers in repository settings so GitHub blocks those deployments until approval is granted.

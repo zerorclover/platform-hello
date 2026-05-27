@@ -1,14 +1,25 @@
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = local.common_tags
+  }
+}
+
+locals {
+  common_tags = merge(var.tags, {
+    ManagedBy = "terraform"
+    Project   = "platform-hello"
+  })
 }
 
 resource "aws_s3_bucket" "state" {
   bucket = var.state_bucket_name
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name    = var.state_bucket_name
     Purpose = "terraform-state"
-  }
+  })
 }
 
 resource "aws_s3_bucket_versioning" "state" {
@@ -63,8 +74,8 @@ resource "aws_dynamodb_table" "lock" {
     enabled = true
   }
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name    = var.lock_table_name
     Purpose = "terraform-state-lock"
-  }
+  })
 }

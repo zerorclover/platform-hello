@@ -1,6 +1,11 @@
-variable "name" {
+variable "name_prefix" {
   type        = string
   description = "Name prefix for container platform resources."
+}
+
+variable "short_name_prefix" {
+  type        = string
+  description = "Short name prefix for resources with strict AWS name length limits."
 }
 
 variable "vpc_id" {
@@ -57,4 +62,9 @@ variable "ecs_task_memory" {
 variable "log_retention_days" {
   type        = number
   description = "CloudWatch log retention in days."
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Common tags applied to container platform resources."
 }

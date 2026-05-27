@@ -3,9 +3,10 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = var.name
-  }
+  tags = merge(var.tags, {
+    Name      = var.name_prefix
+    Component = "network"
+  })
 }
 
 resource "aws_subnet" "public" {
@@ -15,10 +16,11 @@ resource "aws_subnet" "public" {
   availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
 
-  tags = {
-    Name = "${var.name}-public-${count.index + 1}"
-    Tier = "public"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-public-${count.index + 1}"
+    Component = "network"
+    Tier      = "public"
+  })
 }
 
 resource "aws_subnet" "private" {
@@ -27,35 +29,39 @@ resource "aws_subnet" "private" {
   cidr_block        = cidrsubnet(var.cidr_block, 8, count.index + 16)
   availability_zone = var.availability_zones[count.index]
 
-  tags = {
-    Name = "${var.name}-private-${count.index + 1}"
-    Tier = "private"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-private-${count.index + 1}"
+    Component = "network"
+    Tier      = "private"
+  })
 }
 
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
-  tags = {
-    Name = "${var.name}-igw"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-igw"
+    Component = "network"
+  })
 }
 
 resource "aws_eip" "nat" {
   domain = "vpc"
 
-  tags = {
-    Name = "${var.name}-nat"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-nat"
+    Component = "network"
+  })
 }
 
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
 
-  tags = {
-    Name = "${var.name}-nat"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-nat"
+    Component = "network"
+  })
 }
 
 resource "aws_route_table" "public" {
@@ -66,9 +72,11 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.this.id
   }
 
-  tags = {
-    Name = "${var.name}-public"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-public"
+    Component = "network"
+    Tier      = "public"
+  })
 }
 
 resource "aws_route_table" "private" {
@@ -79,9 +87,11 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.this.id
   }
 
-  tags = {
-    Name = "${var.name}-private"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-private"
+    Component = "network"
+    Tier      = "private"
+  })
 }
 
 resource "aws_route_table_association" "public" {

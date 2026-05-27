@@ -28,6 +28,19 @@ terraform plan
 
 Environment-specific values are not copied across five Terraform directories and are not hard-coded in the Terraform stack. They are supplied by GitHub Actions as `TF_VAR_environment`, `TF_VAR_vpc_cidr`, `TF_VAR_availability_zones`, `TF_VAR_db_instance_class`, `TF_VAR_desired_count`, and `TF_VAR_deletion_protection`.
 
+## Naming And Tags
+
+The stack builds standard names from `platform-hello-<environment>`. Resources with strict AWS length limits, such as ALBs and target groups, use the short prefix `ph-<environment>` while keeping full `Name` tags for readability.
+
+Taggable resources receive common tags from the provider and modules:
+
+- `Application`
+- `Environment`
+- `ManagedBy`
+- `Project`
+- Resource-specific `Name`
+- Resource-specific `Component`
+
 ## Terraform State
 
 Terraform state uses an S3 backend configured at `terraform init` time by CI/CD:

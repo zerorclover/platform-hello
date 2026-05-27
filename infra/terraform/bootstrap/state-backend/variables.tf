@@ -12,3 +12,9 @@ variable "lock_table_name" {
   type        = string
   description = "DynamoDB table name for Terraform state locking."
 }
+
+variable "tags" {
+  type        = map(string)
+  description = "Additional tags for Terraform state backend resources."
+  default     = {}
+}

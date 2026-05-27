@@ -1,5 +1,5 @@
 resource "aws_security_group" "database" {
-  name        = "${var.name}-db"
+  name        = "${var.name_prefix}-db"
   description = "PostgreSQL access from backend tasks"
   vpc_id      = var.vpc_id
 
@@ -18,18 +18,20 @@ resource "aws_security_group" "database" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "${var.name}-db"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-db"
+    Component = "database"
+  })
 }
 
 resource "aws_db_subnet_group" "this" {
-  name       = "${var.name}-db"
+  name       = "${var.name_prefix}-db"
   subnet_ids = var.private_subnet_ids
 
-  tags = {
-    Name = "${var.name}-db"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-db"
+    Component = "database"
+  })
 }
 
 resource "random_password" "database" {
@@ -38,7 +40,7 @@ resource "random_password" "database" {
 }
 
 resource "aws_db_instance" "postgres" {
-  identifier              = "${var.name}-postgres"
+  identifier              = "${var.name_prefix}-postgres"
   engine                  = "postgres"
   engine_version          = var.db_engine_version
   instance_class          = var.db_instance_class
@@ -54,14 +56,20 @@ resource "aws_db_instance" "postgres" {
   deletion_protection     = var.deletion_protection
   publicly_accessible     = false
 
-  tags = {
-    Name = "${var.name}-postgres"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-postgres"
+    Component = "database"
+  })
 }
 
 resource "aws_secretsmanager_secret" "database_url" {
-  name        = "${var.name}/database-url"
-  description = "Database connection URL for ${var.name}"
+  name        = "${var.name_prefix}/database-url"
+  description = "Database connection URL for ${var.name_prefix}"
+
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-database-url"
+    Component = "database"
+  })
 }
 
 resource "aws_secretsmanager_secret_version" "database_url" {
@@ -76,11 +84,12 @@ resource "aws_secretsmanager_secret_version" "database_url" {
 }
 
 resource "aws_s3_bucket" "assets" {
-  bucket = "${var.name}-assets"
+  bucket = "${var.name_prefix}-assets"
 
-  tags = {
-    Name = "${var.name}-assets"
-  }
+  tags = merge(var.tags, {
+    Name      = "${var.name_prefix}-assets"
+    Component = "assets"
+  })
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "assets" {

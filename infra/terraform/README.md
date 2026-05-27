@@ -12,6 +12,8 @@ This directory contains AWS infrastructure as code for `platform-hello`.
 
 The root entry point is `infra/terraform/envs/platform`. Terraform exposes environment-specific values as variables. CI/CD supplies those values through `TF_VAR_*`, so the stack does not hard-code per-environment CIDR ranges, availability zones, task counts, ECS sizing, log retention, RDS sizing, backup retention, engine version, or deletion protection.
 
+The stack derives names from `platform-hello-<environment>` and passes a shorter `ph-<environment>` prefix to ALB resources that have strict AWS name length limits. The AWS provider applies common tags by default, and modules add resource-specific `Name` and `Component` tags.
+
 ## Commands
 
 Bootstrap the remote state backend once per AWS account:
@@ -35,6 +37,7 @@ terraform init \
   -backend-config="dynamodb_table=platform-hello-tf-locks" \
   -backend-config="encrypt=true"
 terraform fmt -recursive
+node scripts/check-terraform-standards.mjs
 terraform validate
 TF_VAR_environment=dev \
 TF_VAR_aws_region=$AWS_REGION \
