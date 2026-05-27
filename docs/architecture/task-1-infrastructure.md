@@ -4,7 +4,7 @@
 
 The AWS target architecture uses ECS Fargate for compute, RDS PostgreSQL for relational data, S3 for object storage, ECR for container images, and an Application Load Balancer as the public entry point.
 
-The Terraform stack is controlled by a single `environment` parameter. The shared stack maps `dev`, `test`, `perf`, `staging`, and `production` to the correct CIDR range, task count, RDS size, and deletion protection setting.
+The Terraform stack exposes environment-specific values as variables. GitHub Actions fills those values through `TF_VAR_*`, using matrix values during validation and GitHub Environment variables during deployment.
 
 ```mermaid
 flowchart LR
@@ -19,15 +19,14 @@ flowchart LR
 
 ## Environment Selection
 
-Run the same root module for every environment:
+Run the same root module for every environment. CI/CD is responsible for filling the variable set:
 
 ```bash
 cd infra/terraform/envs/platform
-terraform plan -var environment=dev
-terraform plan -var environment=production
+terraform plan
 ```
 
-Environment-specific values are not copied across five directories. They are centralized in `infra/terraform/stacks/platform/main.tf`.
+Environment-specific values are not copied across five Terraform directories and are not hard-coded in the Terraform stack. They are supplied by GitHub Actions as `TF_VAR_environment`, `TF_VAR_vpc_cidr`, `TF_VAR_availability_zones`, `TF_VAR_db_instance_class`, `TF_VAR_desired_count`, and `TF_VAR_deletion_protection`.
 
 ## Production Notes
 

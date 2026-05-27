@@ -32,6 +32,14 @@ flowchart TD
 - `policy`: runs OPA tests and evaluates the pipeline policy input.
 - `deploy-*`: manual deployment jobs selected by `workflow_dispatch.inputs.environment`.
 
+## Terraform Parameter Injection
+
+Terraform environment settings are owned by CI/CD, not hard-coded inside Terraform:
+
+- Validation uses workflow matrix values and exports them as `TF_VAR_*`.
+- Deployment uses GitHub Environment variables such as `VPC_CIDR`, `AVAILABILITY_ZONES_JSON`, `DB_INSTANCE_CLASS`, `DESIRED_COUNT`, and `DELETION_PROTECTION`.
+- AWS identity and account values are read from GitHub Environment secrets.
+
 ## Approval Model
 
 The `deploy-staging` and `deploy-production` jobs declare GitHub Environments named `staging` and `production`. In a real repository, those environments should require reviewers in repository settings so GitHub blocks the deployment until approval is granted.

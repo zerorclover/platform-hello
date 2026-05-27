@@ -73,17 +73,32 @@ The Terraform code targets AWS and is split into reusable modules:
 - `infra/terraform/modules/data`: RDS PostgreSQL and an encrypted S3 bucket.
 - `infra/terraform/modules/container-platform`: ECR, ECS Fargate services, ALB, IAM roles, logs, and service security groups.
 - `infra/terraform/stacks/platform`: shared environment stack composition.
-- `infra/terraform/envs/platform`: single entry point controlled by `environment`.
+- `infra/terraform/envs/platform`: single entry point; all environment-specific parameters are injected by CI/CD through `TF_VAR_*`.
 
 Example:
 
 ```bash
 cd infra/terraform/envs/platform
 terraform init
-terraform plan -var environment=dev
+terraform plan
 ```
 
 AWS credentials are intentionally not committed. Use environment variables or GitHub Actions secrets when running Terraform.
+
+For CI/CD, configure GitHub Environment variables for each environment:
+
+- `VPC_CIDR`
+- `AVAILABILITY_ZONES_JSON`
+- `DB_NAME`
+- `DB_USERNAME`
+- `DB_INSTANCE_CLASS`
+- `DESIRED_COUNT`
+- `DELETION_PROTECTION`
+
+Configure these GitHub Environment secrets:
+
+- `AWS_ACCOUNT_ID`
+- `AWS_ROLE_TO_ASSUME`
 
 ## Policy
 
