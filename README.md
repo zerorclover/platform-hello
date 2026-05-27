@@ -142,13 +142,13 @@ Terraform state is stored in an encrypted S3 bucket and locked by DynamoDB. Boot
 
 OPA policies are under `policy/opa`:
 
-- Secret scanning must exist in the pipeline.
-- Deployment jobs must depend on the ECR image publishing job.
-- Deployment jobs must declare a GitHub Environment so protected environments can require approval.
+- `policy/opa/common`: enterprise CI/CD baseline checks such as least-privilege workflow permissions, OIDC only at AWS job scope, secret scanning, ECR image publishing, and environment policy gates.
+- `policy/opa/environments/<environment>`: environment-specific deployment rules for `dev`, `test`, `perf`, `staging`, and `production`.
+- `policy/input`: normalized OPA input examples used by CI policy evaluation.
 
 ## CI/CD
 
 GitHub Actions workflow: `.github/workflows/ci.yml`.
 
-The workflow validates tests, image builds, Terraform configuration, security scanning, and OPA policies before deployment jobs can run.
+The workflow validates tests, image builds, Terraform configuration, security scanning, common OPA policies, and the selected environment's OPA policy before deployment jobs can run.
 For manual deployments, the selected GitHub Environment supplies the variables and secrets, the workflow publishes environment-scoped backend/frontend images to ECR, and the matching deploy job applies Terraform with those image tags.

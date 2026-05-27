@@ -1,0 +1,17 @@
+{
+  "selected_environment": "production",
+  "jobs": {
+    "policy-environment": {
+      "environment": "${{ inputs.environment }}"
+    },
+    "deploy": {
+      "environment": "${{ inputs.environment }}",
+      "permissions": { "contents": "read", "id-token": "write" },
+      "needs": ["package-images", "secret-scan", "security-scan", "terraform-validate", "policy-environment"],
+      "steps": [
+        { "run": "terraform plan -input=false -out=tfplan" },
+        { "run": "terraform apply -input=false -auto-approve tfplan" }
+      ]
+    }
+  }
+}

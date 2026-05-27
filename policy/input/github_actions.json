@@ -1,0 +1,114 @@
+{
+  "permissions": {
+    "contents": "read"
+  },
+  "jobs": {
+    "backend-test": {
+      "timeout-minutes": 10,
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "actions/setup-node@v4" },
+        { "run": "npm test" }
+      ]
+    },
+    "secret-scan": {
+      "timeout-minutes": 10,
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "gitleaks/gitleaks-action@v2" }
+      ]
+    },
+    "docker-build": {
+      "timeout-minutes": 20,
+      "needs": ["backend-test"],
+      "strategy": {
+        "matrix": {
+          "component": ["backend", "frontend"]
+        }
+      },
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "docker/setup-buildx-action@v3" },
+        { "uses": "docker/build-push-action@v6", "with": { "push": false } }
+      ]
+    },
+    "security-scan": {
+      "timeout-minutes": 15,
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "aquasecurity/trivy-action@0.24.0" }
+      ]
+    },
+    "terraform-validate": {
+      "timeout-minutes": 15,
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "hashicorp/setup-terraform@v3" },
+        { "run": "terraform fmt -check -recursive" },
+        { "run": "node scripts/check-terraform-standards.mjs" },
+        { "run": "terraform validate" }
+      ]
+    },
+    "policy-common": {
+      "timeout-minutes": 10,
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "run": "opa test policy/opa/common policy/opa/environments" },
+        { "run": "opa eval --data policy/opa/common --input policy/input/github_actions.json" }
+      ]
+    },
+    "policy-environment": {
+      "timeout-minutes": 10,
+      "environment": "${{ inputs.environment }}",
+      "needs": ["policy-common"],
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "run": "opa test policy/opa/environments/${TARGET_ENV}" },
+        { "run": "opa eval --data policy/opa/environments/${TARGET_ENV} --input policy/input/environments/${TARGET_ENV}.json" }
+      ]
+    },
+    "prepare-environment": {
+      "timeout-minutes": 20,
+      "environment": "${{ inputs.environment }}",
+      "permissions": { "contents": "read", "id-token": "write" },
+      "needs": ["docker-build", "secret-scan", "security-scan", "terraform-validate", "policy-environment"],
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "hashicorp/setup-terraform@v3" },
+        { "uses": "aws-actions/configure-aws-credentials@v4" },
+        { "run": "terraform apply -input=false -auto-approve -target=module.platform.module.container_platform.aws_ecr_repository.backend -target=module.platform.module.container_platform.aws_ecr_repository.frontend" }
+      ]
+    },
+    "package-images": {
+      "timeout-minutes": 30,
+      "environment": "${{ inputs.environment }}",
+      "permissions": { "contents": "read", "id-token": "write" },
+      "needs": ["prepare-environment"],
+      "strategy": {
+        "matrix": {
+          "component": ["backend", "frontend"]
+        }
+      },
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "docker/setup-buildx-action@v3" },
+        { "uses": "aws-actions/configure-aws-credentials@v4" },
+        { "uses": "aws-actions/amazon-ecr-login@v2" },
+        { "uses": "docker/build-push-action@v6", "with": { "push": true } }
+      ]
+    },
+    "deploy": {
+      "timeout-minutes": 30,
+      "environment": "${{ inputs.environment }}",
+      "permissions": { "contents": "read", "id-token": "write" },
+      "needs": ["package-images", "secret-scan", "security-scan", "terraform-validate", "policy-environment"],
+      "steps": [
+        { "uses": "actions/checkout@v4", "with": { "persist-credentials": false } },
+        { "uses": "hashicorp/setup-terraform@v3" },
+        { "uses": "aws-actions/configure-aws-credentials@v4" },
+        { "run": "terraform plan -input=false -out=tfplan" },
+        { "run": "terraform apply -input=false -auto-approve tfplan" }
+      ]
+    }
+  }
+}

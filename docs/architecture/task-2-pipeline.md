@@ -13,12 +13,13 @@ flowchart TD
   DockerBuild --> Prepare[Prepare selected environment ECR repositories]
   Prepare --> Package[Build and push selected environment images]
   Checkout --> Terraform[Terraform fmt/init/validate]
-  Checkout --> OPA[OPA policy checks]
+  Checkout --> OPACommon[OPA common policy checks]
+  OPACommon --> OPAEnv[OPA selected environment policy]
   Package --> Deploy{Manual workflow_dispatch}
   SecretScan --> Deploy
   SecurityScan --> Deploy
   Terraform --> Deploy
-  OPA --> Deploy
+  OPAEnv --> Deploy
   Deploy --> Env[Deploy selected GitHub Environment]
 ```
 
@@ -31,8 +32,17 @@ flowchart TD
 - `package-images`: logs in to ECR and pushes backend/frontend images tagged with the commit SHA.
 - `security-scan`: runs Trivy filesystem scanning.
 - `terraform-validate`: checks Terraform formatting, naming/tagging standards, and variable contract without embedding environment values.
-- `policy`: runs OPA tests and evaluates the pipeline policy input.
+- `policy-common`: runs common OPA tests and evaluates enterprise CI/CD baseline controls.
+- `policy-environment`: on manual deployments, loads only the selected environment's OPA policy and input.
 - `deploy`: manual deployment job selected by `workflow_dispatch.inputs.environment`.
+
+## CI/CD Security Baseline
+
+- Workflow-level permissions are read-only; AWS OIDC is granted only on jobs that assume AWS roles.
+- Checkout disables persisted Git credentials.
+- Jobs have explicit timeouts.
+- Workflow concurrency serializes runs by selected environment for manual deployments.
+- Deployment jobs must pass common policy checks and the selected environment policy before touching AWS.
 
 ## Terraform Parameter Injection
 

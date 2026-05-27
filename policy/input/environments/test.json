@@ -1,0 +1,10 @@
+{
+  "selected_environment": "test",
+  "jobs": {
+    "security-scan": {},
+    "deploy": {
+      "environment": "${{ inputs.environment }}",
+      "needs": ["package-images", "secret-scan", "security-scan", "terraform-validate", "policy-environment"]
+    }
+  }
+}

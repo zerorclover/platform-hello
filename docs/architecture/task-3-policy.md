@@ -2,22 +2,26 @@
 
 ## Overview
 
-OPA policies live under `policy/opa`. They enforce required pipeline controls:
+OPA policies live under `policy/opa` and normalized policy inputs live under `policy/input`. Policy is split into a common enterprise baseline plus environment-specific deployment gates.
 
-- The pipeline must include secret scanning.
-- The pipeline must publish environment-scoped images to ECR before deployment.
-- Deployment jobs must depend on the ECR image publishing job.
-- Deployment jobs must declare a GitHub Environment, so repository settings can enforce approvals for protected environments such as staging and production.
-- Runtime credentials must be provided by platform secret stores such as GitHub Actions secrets, local `.env` files ignored by Git, or AWS Secrets Manager.
+- `policy/opa/common`: checks secret scanning, ECR image publishing, environment policy dependencies, GitHub Environment declarations, read-only workflow permissions, and job-level AWS OIDC.
+- `policy/opa/environments/dev`: accepts only dev deployments.
+- `policy/opa/environments/test`: requires test deployments to depend on security scanning.
+- `policy/opa/environments/perf`: requires backend and frontend images to be built for performance deployments.
+- `policy/opa/environments/staging`: requires the selected GitHub Environment gate before staging deploys.
+- `policy/opa/environments/production`: requires production-only input, the selected GitHub Environment gate, OIDC, and Terraform plan before apply.
 
 ## Policy Flow
 
 ```mermaid
 flowchart LR
-  Workflow[GitHub Actions workflow] --> Input[Normalized policy input]
-  Input --> OPA[OPA policy evaluation]
-  OPA --> Allow[No deny results]
-  OPA --> Deny[Deny message blocks pipeline]
+  Workflow[GitHub Actions workflow] --> CommonInput[Common normalized input]
+  Workflow --> EnvInput[Selected environment input]
+  CommonInput --> CommonOPA[Common OPA evaluation]
+  CommonOPA --> EnvOPA[Selected environment OPA evaluation]
+  EnvInput --> EnvOPA
+  EnvOPA --> Allow[No deny results]
+  EnvOPA --> Deny[Deny message blocks pipeline]
 ```
 
 ## Local Commands
@@ -26,7 +30,8 @@ If OPA is installed:
 
 ```bash
 opa test policy/opa
-opa eval --data policy/opa --input policy/opa/input/github_actions.json "data.platform.pipeline.deny"
+opa eval --data policy/opa/common --input policy/input/github_actions.json "data.platform.common.deny"
+opa eval --data policy/opa/environments/production --input policy/input/environments/production.json "data.platform.environments.production.deny"
 ```
 
 ## Required GitHub Settings
