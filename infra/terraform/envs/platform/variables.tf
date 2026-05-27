@@ -3,6 +3,11 @@ variable "environment" {
   description = "Target environment: dev, test, perf, staging, or production."
 }
 
+variable "aws_region" {
+  type        = string
+  description = "AWS region supplied by CI/CD."
+}
+
 variable "backend_image" {
   type        = string
   description = "Backend container image URI."

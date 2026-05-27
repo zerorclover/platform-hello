@@ -24,9 +24,6 @@ permissions:
   id-token: write
   security-events: write
 
-env:
-  AWS_REGION: us-west-2
-
 jobs:
   backend-test:
     name: Backend unit tests
@@ -84,50 +81,6 @@ jobs:
   terraform-validate:
     name: Terraform validation
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - environment: dev
-            vpc_cidr: 10.10.0.0/16
-            availability_zones: '["us-west-2a","us-west-2b"]'
-            db_instance_class: db.t4g.micro
-            desired_count: "1"
-            deletion_protection: "false"
-          - environment: test
-            vpc_cidr: 10.20.0.0/16
-            availability_zones: '["us-west-2a","us-west-2b"]'
-            db_instance_class: db.t4g.micro
-            desired_count: "1"
-            deletion_protection: "false"
-          - environment: perf
-            vpc_cidr: 10.30.0.0/16
-            availability_zones: '["us-west-2a","us-west-2b"]'
-            db_instance_class: db.t4g.small
-            desired_count: "2"
-            deletion_protection: "false"
-          - environment: staging
-            vpc_cidr: 10.40.0.0/16
-            availability_zones: '["us-west-2a","us-west-2b"]'
-            db_instance_class: db.t4g.small
-            desired_count: "2"
-            deletion_protection: "true"
-          - environment: production
-            vpc_cidr: 10.50.0.0/16
-            availability_zones: '["us-west-2a","us-west-2b"]'
-            db_instance_class: db.t4g.medium
-            desired_count: "3"
-            deletion_protection: "true"
-    env:
-      TF_VAR_environment: ${{ matrix.environment }}
-      TF_VAR_backend_image: example.com/platform-hello-backend:validate
-      TF_VAR_frontend_image: example.com/platform-hello-frontend:validate
-      TF_VAR_vpc_cidr: ${{ matrix.vpc_cidr }}
-      TF_VAR_availability_zones: ${{ matrix.availability_zones }}
-      TF_VAR_db_name: platform
-      TF_VAR_db_username: platform
-      TF_VAR_db_instance_class: ${{ matrix.db_instance_class }}
-      TF_VAR_desired_count: ${{ matrix.desired_count }}
-      TF_VAR_deletion_protection: ${{ matrix.deletion_protection }}
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -165,8 +118,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'dev'
     env:
       TF_VAR_environment: dev
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-dev-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-dev-frontend:${{ github.sha }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-dev-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-dev-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -182,12 +136,12 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=platform-hello/dev/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+            -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
         working-directory: infra/terraform/envs/platform
@@ -209,8 +163,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'test'
     env:
       TF_VAR_environment: test
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-test-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-test-frontend:${{ github.sha }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-test-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-test-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -226,12 +181,12 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=platform-hello/test/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+            -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
         working-directory: infra/terraform/envs/platform
@@ -253,8 +208,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'perf'
     env:
       TF_VAR_environment: perf
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-perf-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-perf-frontend:${{ github.sha }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-perf-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-perf-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -270,12 +226,12 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=platform-hello/perf/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+            -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
         working-directory: infra/terraform/envs/platform
@@ -297,8 +253,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'
     env:
       TF_VAR_environment: staging
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-staging-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-staging-frontend:${{ github.sha }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-staging-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-staging-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -314,12 +271,12 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=platform-hello/staging/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+            -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
         working-directory: infra/terraform/envs/platform
@@ -341,8 +298,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
     env:
       TF_VAR_environment: production
-      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-production-backend:${{ github.sha }}
-      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/platform-hello-production-frontend:${{ github.sha }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_backend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-production-backend:${{ github.sha }}
+      TF_VAR_frontend_image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/platform-hello-production-frontend:${{ github.sha }}
       TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
       TF_VAR_availability_zones: ${{ vars.AVAILABILITY_ZONES_JSON }}
       TF_VAR_db_name: ${{ vars.DB_NAME }}
@@ -358,12 +316,12 @@ jobs:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
       - run: |
           terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=platform-hello/production/terraform.tfstate" \
-            -backend-config="region=${AWS_REGION}" \
+            -backend-config="region=${TF_VAR_aws_region}" \
             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
             -backend-config="encrypt=true"
         working-directory: infra/terraform/envs/platform

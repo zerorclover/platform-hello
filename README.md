@@ -82,7 +82,7 @@ cd infra/terraform/envs/platform
 terraform init \
   -backend-config="bucket=$TF_STATE_BUCKET" \
   -backend-config="key=platform-hello/dev/terraform.tfstate" \
-  -backend-config="region=us-west-2" \
+  -backend-config="region=$AWS_REGION" \
   -backend-config="dynamodb_table=$TF_STATE_LOCK_TABLE" \
   -backend-config="encrypt=true"
 terraform plan
@@ -93,6 +93,7 @@ AWS credentials are intentionally not committed. Use environment variables or Gi
 For CI/CD, configure GitHub Environment variables for each environment:
 
 - `VPC_CIDR`
+- `AWS_REGION`
 - `AVAILABILITY_ZONES_JSON`
 - `DB_NAME`
 - `DB_USERNAME`

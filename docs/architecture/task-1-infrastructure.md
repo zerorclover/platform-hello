@@ -4,7 +4,7 @@
 
 The AWS target architecture uses ECS Fargate for compute, RDS PostgreSQL for relational data, S3 for object storage, ECR for container images, and an Application Load Balancer as the public entry point.
 
-The Terraform stack exposes environment-specific values as variables. GitHub Actions fills those values through `TF_VAR_*`, using matrix values during validation and GitHub Environment variables during deployment.
+The Terraform stack exposes environment-specific values as variables. GitHub Actions fills those values through `TF_VAR_*` from GitHub Environment variables during deployment.
 
 ```mermaid
 flowchart LR

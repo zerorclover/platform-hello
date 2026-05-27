@@ -31,16 +31,17 @@ cd infra/terraform/envs/platform
 terraform init \
   -backend-config="bucket=platform-hello-tfstate-<account-id>" \
   -backend-config="key=platform-hello/dev/terraform.tfstate" \
-  -backend-config="region=us-west-2" \
+  -backend-config="region=$AWS_REGION" \
   -backend-config="dynamodb_table=platform-hello-tf-locks" \
   -backend-config="encrypt=true"
 terraform fmt -recursive
 terraform validate
 TF_VAR_environment=dev \
-TF_VAR_backend_image=111111111111.dkr.ecr.us-west-2.amazonaws.com/platform-hello-dev-backend:latest \
-TF_VAR_frontend_image=111111111111.dkr.ecr.us-west-2.amazonaws.com/platform-hello-dev-frontend:latest \
+TF_VAR_aws_region=$AWS_REGION \
+TF_VAR_backend_image=111111111111.dkr.ecr.$AWS_REGION.amazonaws.com/platform-hello-dev-backend:latest \
+TF_VAR_frontend_image=111111111111.dkr.ecr.$AWS_REGION.amazonaws.com/platform-hello-dev-frontend:latest \
 TF_VAR_vpc_cidr=10.10.0.0/16 \
-TF_VAR_availability_zones='["us-west-2a","us-west-2b"]' \
+TF_VAR_availability_zones='["${AWS_REGION}a","${AWS_REGION}b"]' \
 TF_VAR_db_name=platform \
 TF_VAR_db_username=platform \
 TF_VAR_db_instance_class=db.t4g.micro \
@@ -59,7 +60,7 @@ The platform stack uses a partial S3 backend so account-specific backend values 
 
 - `bucket`: `TF_STATE_BUCKET` GitHub Environment variable.
 - `key`: `platform-hello/<environment>/terraform.tfstate`.
-- `region`: workflow `AWS_REGION`.
+- `region`: `AWS_REGION` GitHub Environment variable.
 - `dynamodb_table`: `TF_STATE_LOCK_TABLE` GitHub Environment variable.
 - `encrypt`: `true`.
 

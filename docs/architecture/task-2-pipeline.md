@@ -28,7 +28,7 @@ flowchart TD
 - `secret-scan`: runs Gitleaks to block hard-coded credentials.
 - `docker-build`: builds backend and frontend images without pushing on PRs.
 - `security-scan`: runs Trivy filesystem scanning.
-- `terraform-validate`: checks all supported environment selections.
+- `terraform-validate`: checks Terraform formatting and variable contract without embedding environment values.
 - `policy`: runs OPA tests and evaluates the pipeline policy input.
 - `deploy-*`: manual deployment jobs selected by `workflow_dispatch.inputs.environment`.
 
@@ -36,8 +36,8 @@ flowchart TD
 
 Terraform environment settings are owned by CI/CD, not hard-coded inside Terraform:
 
-- Validation uses workflow matrix values and exports them as `TF_VAR_*`.
-- Deployment uses GitHub Environment variables such as `VPC_CIDR`, `AVAILABILITY_ZONES_JSON`, `DB_INSTANCE_CLASS`, `DESIRED_COUNT`, and `DELETION_PROTECTION`.
+- Validation checks Terraform syntax without embedding environment-specific values.
+- Deployment uses GitHub Environment variables such as `AWS_REGION`, `VPC_CIDR`, `AVAILABILITY_ZONES_JSON`, `DB_INSTANCE_CLASS`, `DESIRED_COUNT`, and `DELETION_PROTECTION`.
 - AWS identity and account values are read from GitHub Environment secrets.
 - Terraform backend values are read from `TF_STATE_BUCKET` and `TF_STATE_LOCK_TABLE`, then passed to `terraform init` with `encrypt=true` and an environment-specific state key.
 
