@@ -14,6 +14,17 @@ The root entry point is `infra/terraform/envs/platform`. Terraform exposes envir
 
 The stack derives names from `platform-hello-<environment>` and passes a shorter `ph-<environment>` prefix to ALB resources that have strict AWS name length limits. The AWS provider applies common tags by default, and modules add resource-specific `Name` and `Component` tags.
 
+## Module Design
+
+- `bootstrap/state-backend`: creates the encrypted S3 state bucket and DynamoDB lock table.
+- `envs/platform`: the only deployment root module. It owns provider configuration, default tags, and the partial S3 backend.
+- `stacks/platform`: composes network, data, and container platform modules for a selected environment.
+- `modules/network`: owns VPC, subnets, NAT, internet gateway, and route tables.
+- `modules/data`: owns RDS PostgreSQL, generated password, Secrets Manager database URL, and encrypted assets bucket.
+- `modules/container-platform`: owns ECR, ECS, ALB, IAM, service security groups, and logs.
+
+The root stack uses `name_prefix = platform-hello-<environment>` and `short_name_prefix = ph-<environment>`. The short prefix is used only where AWS name length limits make the full prefix risky.
+
 ## Commands
 
 Bootstrap the remote state backend once per AWS account:
@@ -63,6 +74,18 @@ In GitHub Actions, these same values are provided by repository variables for va
 
 Database credentials are generated with the Terraform `random` provider and exposed to ECS through AWS Secrets Manager. The application receives `DATABASE_URL` as an ECS secret, not as a plain task environment variable.
 
+## CI/CD Contract
+
+CI/CD is the source of environment-specific deployment values:
+
+- GitHub Environment variables provide Terraform `TF_VAR_*` values and backend config values.
+- GitHub Environment secrets provide `AWS_ACCOUNT_ID` and `AWS_ROLE_TO_ASSUME`.
+- GitHub OIDC assumes the AWS deployment role at job scope.
+- Backend config is supplied through `terraform init -backend-config=...`.
+- Container image tags are generated from the selected environment and commit SHA.
+
+The deployment workflow first targets ECR repositories so environment-scoped images can be pushed, then runs a full plan/apply using the pushed image tags.
+
 ## State
 
 The platform stack uses a partial S3 backend so account-specific backend values are supplied by CI/CD:
@@ -80,3 +103,13 @@ The bootstrap stack creates:
 - S3 public access block and bucket-owner-enforced ownership.
 - A DynamoDB lock table with `LockID` hash key.
 - DynamoDB server-side encryption and point-in-time recovery.
+
+## Standards
+
+Infrastructure code follows these repository standards:
+
+- No plaintext database password in Terraform variables, workflow files, or task environment variables.
+- All tunable environment parameters are variables supplied by CI/CD.
+- Taggable resources receive common provider tags and resource-specific `Name`/`Component` tags.
+- Long AWS resource names use the full environment prefix, while ALB-constrained names use the short prefix.
+- Terraform state is remote, encrypted, and locked before environment deployments run.

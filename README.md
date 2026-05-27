@@ -48,10 +48,10 @@ node --test backend/test/app.test.js
 ## Test Assignment Mapping
 
 - Task 0: this repository provides the multi-tier application codebase.
-- Task 1: Terraform provisions AWS VPC, ALB, ECS Fargate, ECR, RDS PostgreSQL, and S3 for five environments.
-- Task 2: GitHub Actions runs tests, image builds, Terraform validation, security scanning, policy checks, and gated deployments.
-- Task 3: OPA policies enforce staging/production approvals and secret scanning in the pipeline definition.
-- Task 4: architecture, infrastructure, pipeline, and policy diagrams are maintained under `docs/architecture`.
+- Task 1: Terraform provisions AWS VPC, ALB, ECS Fargate, ECR, RDS PostgreSQL, Secrets Manager, S3, encrypted remote state, and DynamoDB locking for five environments.
+- Task 2: GitHub Actions runs tests, image builds, Terraform validation, security scanning, common OPA checks, selected-environment OPA checks, ECR publishing, and gated deployments.
+- Task 3: OPA policies enforce enterprise CI/CD baselines and per-environment deployment rules.
+- Task 4: architecture, infrastructure, pipeline, policy, and documentation-as-code decisions are maintained under `docs/architecture`.
 
 ## Repository Layout
 
@@ -60,7 +60,9 @@ backend/                 Node.js API
 frontend/                Static UI served by Nginx
 database/                Local PostgreSQL bootstrap SQL
 infra/terraform/         AWS infrastructure as code
-policy/opa/              OPA policies and tests
+policy/input/            Normalized OPA input examples
+policy/opa/              OPA policies and tests split by common and environment rules
+scripts/                 Repository validation scripts
 docs/architecture/       Design documentation and diagrams
 .github/workflows/      CI/CD pipeline definition
 ```
@@ -136,7 +138,7 @@ Configure these GitHub Environment secrets:
 - `AWS_ACCOUNT_ID`
 - `AWS_ROLE_TO_ASSUME`
 
-Terraform state is stored in an encrypted S3 bucket and locked by DynamoDB. Bootstrap those backend resources from `infra/terraform/bootstrap/state-backend` before running environment deployments.
+Terraform state is stored in an encrypted S3 bucket and locked by DynamoDB. Bootstrap those backend resources from `infra/terraform/bootstrap/state-backend` before running environment deployments. The platform stack uses a partial backend so bucket, lock table, region, and environment-specific state key are supplied by CI/CD at `terraform init` time.
 
 ## Policy
 
@@ -150,5 +152,6 @@ OPA policies are under `policy/opa`:
 
 GitHub Actions workflow: `.github/workflows/ci.yml`.
 
-The workflow validates tests, image builds, Terraform configuration, security scanning, common OPA policies, and the selected environment's OPA policy before deployment jobs can run.
-For manual deployments, the selected GitHub Environment supplies the variables and secrets, the workflow publishes environment-scoped backend/frontend images to ECR, and the matching deploy job applies Terraform with those image tags.
+The workflow validates tests, image builds, Terraform configuration, security scanning, common OPA policies, and the selected environment's OPA policy before deployment jobs can run. Workflow-level permissions are read-only; AWS OIDC is granted only on AWS jobs; checkout disables persisted credentials; jobs have explicit timeouts; and manual deployments are serialized by selected environment.
+
+For manual deployments, `workflow_dispatch.inputs.environment` selects the GitHub Environment. That environment supplies variables and secrets, the workflow prepares ECR repositories, publishes environment-scoped backend/frontend images, and the deploy job applies Terraform with those image tags.
